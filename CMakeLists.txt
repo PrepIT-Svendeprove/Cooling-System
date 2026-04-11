@@ -7,6 +7,16 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 
+Include(FetchContent)
+
+FetchContent_Declare(
+        etl
+        GIT_REPOSITORY https://github.com/ETLCPP/etl
+        GIT_TAG        20.45.0
+)
+
+FetchContent_MakeAvailable(etl)
+
 
 # Define the build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -28,7 +38,10 @@ enable_language(C CXX ASM)
 
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME}
-        main.cpp)
+        main.cpp
+        tasks/external_cool_task.cpp
+        tasks/communication_task.cpp
+)
 
 #add_subdirectory(Application)
 
@@ -49,6 +62,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
         # Add user defined include paths
+        tasks
 )
 
 # Add project symbols (macros)
@@ -61,7 +75,7 @@ list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 
 # Add linked libraries
 target_link_libraries(${CMAKE_PROJECT_NAME}
+        etl::etl
         stm32cubemx
-
         # Add user defined libraries
 )
