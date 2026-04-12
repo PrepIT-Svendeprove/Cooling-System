@@ -5,6 +5,7 @@
 #include <etl/array.h>
 
 #include "adc.h"
+#include "aht_20.hpp"
 #include "i2c.h"
 
 namespace tasks {
@@ -13,39 +14,23 @@ namespace tasks {
     }
 
     void external_cool_task::run() {
-        constexpr std::uint8_t aht_addr = 0x38 << 1;
 
-        osDelay(50);
-        etl::array<std::uint8_t, 3> init_cmd{0xBE, 0x08, 0x00};
-        etl::array<std::uint8_t, 4> init_data{0};
-        HAL_I2C_Mem_Read(&hi2c1, aht_addr, 0x71, 1, init_data.data(), 1, 100);
-        if (!((init_data[0] >> 3) & 0x1)) {
-            HAL_I2C_Master_Transmit(&hi2c1, aht_addr, init_cmd.data(), init_cmd.size(), 1000);
-        }
+        drivers::aht20 temp_sensor{&hi2c1};
 
-        osDelay(50);
+        temp_sensor.init();
 
         while (true) {
-            const auto calculated_voltage_x100 = get_voltage_x100();
-            std::uint32_t calculated_heatsink_temperature = (calculated_voltage_x100 - 218) + 25;
+            //const auto calculated_voltage_x100 = get_voltage_x100();
+            //std::uint32_t calculated_heatsink_temperature = (calculated_voltage_x100 - 218) + 25;
 
-            etl::array<std::uint8_t, 3> trigger_measurement_cmd{0xAC, 0x33, 0x00};
-            HAL_I2C_Master_Transmit(&hi2c1, aht_addr, trigger_measurement_cmd.data(), trigger_measurement_cmd.size(), 1000);
-            osDelay(80);
-            etl::array<std::uint8_t, 6> data_buffer{0};
-            do {
-                HAL_I2C_Mem_Read(&hi2c1, aht_addr, 0x71, 1, data_buffer.data(), 1, 100);
-                osDelay(1);
-            } while((data_buffer[0] >> 7) & 0x1);
+            temp_sensor.read_sensor();
 
-            data_buffer.fill(0);
-
-            HAL_I2C_Master_Receive(&hi2c1, aht_addr, data_buffer.data(), data_buffer.size(), 1000);
-            std::uint32_t temp_data = (data_buffer[3]&0x0F)<<16 | (data_buffer[4])<<8 | data_buffer[5];
-            auto ambient_temp = static_cast<std::uint32_t>((temp_data / std::pow(2,20)*200 - 50));
-
+            auto ambient_temp = temp_sensor.get_last_temperature();
             //auto temp_diff = static_cast<std::int32_t>(calculated_heatsink_temperature) - static_cast<std::int32_t>(ambient_temp);
             // LM235s are broken, find replacement for heatsink temperature measurement.
+
+            // Temporary just keep them enabled, until new temperature sensor is available, consider using ambient to check "output" temp of air from heatsink.
+            HAL_GPIO_WritePin(EXT_COOL_FANS_GPIO_Port, EXT_COOL_FANS_Pin, GPIO_PIN_SET);
 
             osMessageQueuePut(_ambientTemperatures, &ambient_temp, 0, 0);
             osDelay(1000);

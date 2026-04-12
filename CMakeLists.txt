@@ -41,6 +41,8 @@ add_executable(${CMAKE_PROJECT_NAME}
         main.cpp
         tasks/external_cool_task.cpp
         tasks/communication_task.cpp
+        drivers/aht_20.cpp
+        drivers/aht_20.hpp
 )
 
 #add_subdirectory(Application)
@@ -63,6 +65,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
         # Add user defined include paths
         tasks
+        drivers
 )
 
 # Add project symbols (macros)

@@ -16,7 +16,7 @@ namespace tasks {
 
         while (true) {
             if (osMessageQueueGetCount(_ambientTemperatures) > 0) {
-                std::uint32_t tempValue;
+                std::int32_t tempValue;
                 osMessageQueueGet(_ambientTemperatures, &tempValue, nullptr, 0);
                 etl::string<18> str{"ADC value: "};
                 str.append(std::to_string(tempValue).data());
