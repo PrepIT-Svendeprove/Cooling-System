@@ -43,6 +43,8 @@ add_executable(${CMAKE_PROJECT_NAME}
         tasks/communication_task.cpp
         drivers/aht_20.cpp
         drivers/aht_20.hpp
+        tasks/climate_control_task.cpp
+        tasks/climate_control_task.hpp
 )
 
 #add_subdirectory(Application)

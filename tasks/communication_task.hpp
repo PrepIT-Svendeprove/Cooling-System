@@ -4,7 +4,7 @@
 namespace tasks {
     class communication_task {
     public:
-        communication_task(osMessageQueueId_t ambientTemperatures);
+        communication_task(osMessageQueueId_t ambientTemperatures, osMessageQueueId_t internalTemperatures);
 
         void run();
 
@@ -14,5 +14,6 @@ namespace tasks {
 
     private:
         osMessageQueueId_t _ambientTemperatures;
+        osMessageQueueId_t _internalTemperatures;
     };
 } // tasks
