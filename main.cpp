@@ -38,7 +38,7 @@ namespace {
     osMessageQueueId_t target_humidity_queue_id = osMessageQueueNew(3, sizeof(std::int32_t), &target_humidity_attr);
 
     tasks::external_cool_task ext_cool_task{ambient_temperatures_queue_id};
-    tasks::communication_task comms_task{ambient_temperatures_queue_id, internal_temperatures_queue_id};
+    tasks::communication_task comms_task{ambient_temperatures_queue_id, internal_temperatures_queue_id, target_temperatures_queue_id};
     tasks::climate_control_task cc_task{internal_temperatures_queue_id, internal_humidity_queue_id, target_temperatures_queue_id, target_humidity_queue_id};
 
     const osThreadAttr_t ext_cool_attr = {

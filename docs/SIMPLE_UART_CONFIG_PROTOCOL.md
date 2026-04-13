@@ -8,7 +8,7 @@ to do it.
 
 The protocol uses a very simple compact text format to set values.
 
-Each message starts with a 2 byte break consisting of 0xAAAA and then a message length byte 3-255 is the valid range. (3
+Each message starts with a 2 byte break consisting of 0xAAAA and then a message length byte 3-128 is the valid range. (3
 is the minimum number of characters to complete a theoretical mimimal package)
 
 Refer to the table below for example of message construction.
