@@ -6,11 +6,6 @@
 #include "etl/string.h"
 #include "usart.h"
 
-extern "C" {
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-
-}
-}
 
 namespace tasks {
     communication_task::communication_task(osMessageQueueId_t ambientTemperatures,
@@ -22,26 +17,27 @@ namespace tasks {
     }
 
     void communication_task::run() {
+
         while (true) {
-            etl::string<64> str{};
+            std::int32_t _last_ambient_temp{};
+            std::int32_t _last_internal_temp{};
             if (osMessageQueueGetCount(_ambientTemperatures) > 0) {
                 std::int32_t tempValue;
                 osMessageQueueGet(_ambientTemperatures, &tempValue, nullptr, 0);
-                str.append("AMBT:");
-                str.append(std::to_string(tempValue).data());
-                str.append("\r\n");
+                if (tempValue > 0) {
+                    _last_ambient_temp = tempValue;
+                }
+            }
+            if (osMessageQueueGetCount(_internalTemperatures) > 0) {
+                std::int32_t tempValue;
                 osMessageQueueGet(_internalTemperatures, &tempValue, nullptr, 0);
-                str.append("INTT:");
-                str.append(std::to_string(tempValue).data());
-                str.append("\r\n");
+                if (tempValue > 0) {
+                    _last_internal_temp = tempValue;
+                }
             }
-            etl::array<std::uint8_t, 64> uartTxData{};
-            std::copy_n(str.begin(), str.size(), uartTxData.begin());
-            if (HAL_UART_Transmit_DMA(&huart1, uartTxData.data(), str.size()) != HAL_OK) {
-                osDelay(100);
-                HAL_UART_Transmit_DMA(&huart1, uartTxData.data(), str.size());
-            }
+
             etl::array<std::uint8_t, 64> uartRxData{};
+
             if (HAL_UART_Receive_DMA(&huart1, uartRxData.data(), 2) == HAL_OK) {
                 if (uartRxData[0] == 0xAA && uartRxData[1] == 0xAA) {
                     if (HAL_UART_Receive_DMA(&huart1, uartRxData.data() + 2, 1) != HAL_OK) {
@@ -71,7 +67,7 @@ namespace tasks {
                 }
             }
 
-            osDelay(1000);
+            osDelay(10);
         }
     }
 } // tasks

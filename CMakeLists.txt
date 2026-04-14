@@ -45,6 +45,8 @@ add_executable(${CMAKE_PROJECT_NAME}
         drivers/aht_20.hpp
         tasks/climate_control_task.cpp
         tasks/climate_control_task.hpp
+        drivers/serialport.cpp
+        drivers/serialport.hpp
 )
 
 #add_subdirectory(Application)
