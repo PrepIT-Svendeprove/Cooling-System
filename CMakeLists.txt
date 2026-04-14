@@ -68,6 +68,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
         # Add user defined include paths
         tasks
         drivers
+        types
 )
 
 # Add project symbols (macros)

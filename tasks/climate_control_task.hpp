@@ -6,7 +6,7 @@
 namespace tasks {
     class climate_control_task {
     public:
-        climate_control_task(osMessageQueueId_t internal_temperatures, osMessageQueueId_t internal_humidity, osMessageQueueId_t target_temperatures, osMessageQueueId_t target_humidity);
+        climate_control_task(osMessageQueueId_t internal_temperatures, osMessageQueueId_t internal_humidity, osMessageQueueId_t target_temperatures, osMessageQueueId_t target_humidity, osMessageQueueId_t control_commands);
         ~climate_control_task() = default;
         climate_control_task(const climate_control_task&) = delete;
         climate_control_task& operator=(const climate_control_task&) = delete;
@@ -29,7 +29,9 @@ namespace tasks {
         osMessageQueueId_t _internal_humidity;
         osMessageQueueId_t _target_temperatures;
         osMessageQueueId_t _target_humidity;
+        osMessageQueueId_t _control_commands;
         std::int32_t _current_target_temperature;
         std::int32_t _current_target_humidity;
+        bool _cooling_enabled;
     };
 }

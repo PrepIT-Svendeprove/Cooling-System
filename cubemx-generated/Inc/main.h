@@ -61,10 +61,10 @@ void Error_Handler(void);
 #define LED_GPIO_Port GPIOC
 #define PELTIER_Pin GPIO_PIN_12
 #define PELTIER_GPIO_Port GPIOB
-#define EXT_COOL_FANS_Pin GPIO_PIN_13
-#define EXT_COOL_FANS_GPIO_Port GPIOB
-#define INT_CIR_FAN_Pin GPIO_PIN_14
+#define INT_CIR_FAN_Pin GPIO_PIN_13
 #define INT_CIR_FAN_GPIO_Port GPIOB
+#define EXT_COOL_FANS_Pin GPIO_PIN_14
+#define EXT_COOL_FANS_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

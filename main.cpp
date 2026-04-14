@@ -10,6 +10,7 @@
 #include <cstdint>
 
 #include "climate_control_task.hpp"
+#include "commands.hpp"
 #include "tasks/communication_task.hpp"
 
 extern "C" {
@@ -36,10 +37,13 @@ namespace {
     osMessageQueueId_t target_temperatures_queue_id = osMessageQueueNew(3, sizeof(std::int32_t), &target_temp_attr);
     osMessageQueueAttr_t target_humidity_attr = {.name = "target_humidity"};
     osMessageQueueId_t target_humidity_queue_id = osMessageQueueNew(3, sizeof(std::int32_t), &target_humidity_attr);
+    osMessageQueueAttr_t control_commands_attr = {.name = "control_commands"};
+    osMessageQueueId_t control_commands_queue_id = osMessageQueueNew(3, sizeof(types::command), &control_commands_attr);
 
     tasks::external_cool_task ext_cool_task{ambient_temperatures_queue_id};
     tasks::communication_task comms_task{ambient_temperatures_queue_id, internal_temperatures_queue_id, target_temperatures_queue_id};
-    tasks::climate_control_task cc_task{internal_temperatures_queue_id, internal_humidity_queue_id, target_temperatures_queue_id, target_humidity_queue_id};
+    tasks::climate_control_task cc_task{internal_temperatures_queue_id, internal_humidity_queue_id, target_temperatures_queue_id, target_humidity_queue_id, control_commands_queue_id};
+
 
     const osThreadAttr_t ext_cool_attr = {
         .name = "Ext_Cooling",
