@@ -17,7 +17,6 @@ namespace tasks {
     }
 
     void communication_task::run() {
-
         while (true) {
             std::int32_t _last_ambient_temp{};
             std::int32_t _last_internal_temp{};
@@ -37,32 +36,27 @@ namespace tasks {
             }
 
             etl::array<std::uint8_t, 64> uartRxData{};
-
-            if (HAL_UART_Receive_DMA(&huart1, uartRxData.data(), 2) == HAL_OK) {
+            std::uint16_t receivedBytes = 0;
+            HAL_UARTEx_ReceiveToIdle(&huart1, uartRxData.data(), uartRxData.size(), &receivedBytes, 100);
+            if (receivedBytes > 0) {
                 if (uartRxData[0] == 0xAA && uartRxData[1] == 0xAA) {
-                    if (HAL_UART_Receive_DMA(&huart1, uartRxData.data() + 2, 1) != HAL_OK) {
-                        //return false;
-                    } else {
-                        // reorganise in new method later.
-
-                        std::uint8_t size = uartRxData[2];
-                        if (HAL_UART_Receive_DMA(&huart1, uartRxData.data() + 3, size) != HAL_OK) {
-                        } else {
-                            etl::string<64> received_str{};
-                            etl::copy_n(uartRxData.data() + 3, size, received_str.begin());
-
-                            auto first_equals = received_str.find_first_of("=");
-                            if (received_str.substr(0, first_equals) == "TARGET_TEMP") {
-                                std::size_t paramEnd = size;
-                                if (auto split = received_str.find(";")) {
-                                    paramEnd = split;
-                                }
-                                std::int32_t tempValue = std::stoi(received_str.substr(first_equals + paramEnd).data());
-                                osMessageQueuePut(_targetTemperatures, &tempValue, 0, 0);
-                                HAL_UART_Transmit(&huart1, reinterpret_cast<const uint8_t *>("TARGET_TEMP SET!\r\n"),
-                                                  sizeof("TARGET_TEMP SET!\r\n"), 0);
-                            }
+                    std::uint8_t messageSize = uartRxData[2];
+                    etl::string<64> received_str{};
+                    received_str.fill(0);
+                    received_str.resize(messageSize);
+                    etl::copy_n(uartRxData.data() + 3, messageSize, received_str.begin());
+                    auto e = '=';
+                    auto first_equals = received_str.find(e);
+                    if (first_equals != std::string::npos && received_str.substr(0, first_equals) == "TARGET_TEMP") {
+                        std::size_t paramEnd = messageSize;
+                        if (auto split = received_str.find(";"); split != std::string::npos) {
+                            paramEnd = split;
                         }
+                        auto valueStr = received_str.substr(first_equals + 1, paramEnd - (first_equals + 1)).data();
+                        std::int32_t tempValue = std::stoi(valueStr);
+                        osMessageQueuePut(_targetTemperatures, &tempValue, 0, 0);
+                        HAL_UART_Transmit_DMA(&huart1, reinterpret_cast<const uint8_t *>("TARGET_TEMP SET!\r\n"),
+                                          sizeof("TARGET_TEMP SET!\r\n"));
                     }
                 }
             }
