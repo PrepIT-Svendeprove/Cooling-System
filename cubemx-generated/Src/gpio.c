@@ -54,6 +54,9 @@ void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(ENC_RST_GPIO_Port, ENC_RST_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, PELTIER_Pin|INT_CIR_FAN_Pin|EXT_COOL_FANS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : LED_Pin */
@@ -62,6 +65,13 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : ENC_RST_Pin */
+  GPIO_InitStruct.Pin = ENC_RST_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(ENC_RST_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PELTIER_Pin INT_CIR_FAN_Pin EXT_COOL_FANS_Pin */
   GPIO_InitStruct.Pin = PELTIER_Pin|INT_CIR_FAN_Pin|EXT_COOL_FANS_Pin;

@@ -51,7 +51,7 @@ add_executable(${CMAKE_PROJECT_NAME}
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cubemx-generated/cmake/stm32cubemx)
-
+add_subdirectory(drivers/Ethernet)
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -83,5 +83,6 @@ list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 target_link_libraries(${CMAKE_PROJECT_NAME}
         etl::etl
         stm32cubemx
+        ethernet
         # Add user defined libraries
 )
