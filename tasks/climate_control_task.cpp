@@ -9,7 +9,7 @@ namespace tasks {
                                                osMessageQueueId_t target_temperatures,
                                                osMessageQueueId_t target_humidity,
                                                osMessageQueueId_t control_commands) :
-    _internal_temperatures{internal_temperatures},
+        _internal_temperatures{internal_temperatures},
         _internal_humidity{internal_humidity},
         _target_temperatures{target_temperatures},
         _target_humidity{target_humidity},
@@ -22,6 +22,8 @@ namespace tasks {
     void climate_control_task::run() {
         drivers::aht20 temp_sensor{&hi2c2};
         temp_sensor.init();
+
+        bool cooling_running{false};
         while (true) {
             temp_sensor.read_sensor();
 
@@ -53,10 +55,12 @@ namespace tasks {
             if ( _cooling_enabled && temp > _current_target_temperature) {
                 HAL_GPIO_WritePin(PELTIER_GPIO_Port, PELTIER_Pin, GPIO_PIN_SET);
                 HAL_GPIO_WritePin(INT_CIR_FAN_GPIO_Port, INT_CIR_FAN_Pin, GPIO_PIN_SET);
-            } else {
+                cooling_running = true;
+            } else if (cooling_running) {
                 HAL_GPIO_WritePin(INT_CIR_FAN_GPIO_Port, INT_CIR_FAN_Pin, GPIO_PIN_RESET);
                 osDelay(1000);
                 HAL_GPIO_WritePin(PELTIER_GPIO_Port, PELTIER_Pin, GPIO_PIN_RESET);
+                cooling_running = false;
             }
             if (const auto messageCount = osMessageQueueGetCount(_control_commands); messageCount > 0) {
                 for (std::size_t i = 0; i < messageCount; i++) {

@@ -5,6 +5,7 @@
 #include "communication_task.hpp"
 
 
+#include "commands.hpp"
 #include "spi.h"
 #include "etl/string.h"
 #include "etl/vector.h"
@@ -13,17 +14,19 @@
 namespace tasks {
     communication_task::communication_task(osMessageQueueId_t ambientTemperatures,
                                            osMessageQueueId_t internalTemperatures,
-                                           osMessageQueueId_t targetTemperatures) : _ambientTemperatures(
-            ambientTemperatures),
-        _internalTemperatures(internalTemperatures),
-        _targetTemperatures(targetTemperatures) {
+                                           osMessageQueueId_t targetTemperatures,
+                                           osMessageQueueId_t controlCommands) : _ambientTemperatures{
+            ambientTemperatures
+        },
+        _internalTemperatures{internalTemperatures},
+        _targetTemperatures{targetTemperatures},
+        _controlCommands{controlCommands},
+        _last_internal_temp{0},
+        _last_ambient_temp{0} {
     }
 
     void communication_task::run() {
-
         while (true) {
-            std::int32_t _last_ambient_temp{};
-            std::int32_t _last_internal_temp{};
             if (osMessageQueueGetCount(_ambientTemperatures) > 0) {
                 std::int32_t tempValue;
                 osMessageQueueGet(_ambientTemperatures, &tempValue, nullptr, 0);
@@ -49,7 +52,7 @@ namespace tasks {
                     received_str.fill(0);
                     received_str.resize(messageSize);
                     etl::copy_n(uartRxData.data() + 3, messageSize, received_str.begin());
-                    etl::vector<etl::string<20>,10> parameters{};
+                    etl::vector<etl::string<20>, 10> parameters{};
                     if (received_str.contains(';')) {
                         auto pos = received_str.find(';');
                         while (pos != std::string::npos) {
@@ -61,24 +64,76 @@ namespace tasks {
                     } else {
                         parameters.push_back(received_str);
                     }
-
-                    auto first_equals = received_str.find('=');
-                    etl::string<64> parameter = received_str.substr(0, first_equals);
-                    if (first_equals != std::string::npos &&  parameter == "TARGET_TEMP") {
-                        std::size_t paramEnd = messageSize;
-                        if (auto split = received_str.find(";"); split != std::string::npos) {
-                            paramEnd = split;
+                    for (const auto &parameterString: parameters) {
+                        const auto equals = parameterString.find('=');
+                        if (equals == std::string::npos) {
+                            continue;
                         }
-                        auto valueStr = received_str.substr(first_equals + 1, paramEnd - (first_equals + 1)).data();
-                        std::int32_t tempValue = std::stoi(valueStr);
-                        osMessageQueuePut(_targetTemperatures, &tempValue, 0, 0);
-                        HAL_UART_Transmit_DMA(&huart1, reinterpret_cast<const uint8_t *>("TARGET_TEMP SET!\r\n"),
-                                              sizeof("TARGET_TEMP SET!\r\n"));
+                        auto parameter = parameterString.substr(0, equals);
+                        auto value = parameterString.substr(equals + 1);
+                        if (parameter == "TARGET_TEMP") {
+                            std::int32_t tempValue = std::stoi(value.data());
+                            osMessageQueuePut(_targetTemperatures, &tempValue, 0, 0);
+                            HAL_UART_Transmit_DMA(&huart1, reinterpret_cast<const uint8_t *>("TARGET_TEMP SET\r\n"),
+                                                  sizeof("TARGET_TEMP SET\r\n"));
+                        } else if (parameter == "TARGET_HUMIDITY") {
+                            etl::string<35> responseStr{"HUMIDITY CURRENTLY NOT SUPPORTED\r\n"};
+                            HAL_UART_Transmit_DMA(&huart1, reinterpret_cast<const uint8_t *>(responseStr.data()),
+                                                  responseStr.size());
+                        } else if (parameter == "MQTT_BROKER") {
+                        } else if (parameter == "MQTT_PORT") {
+                        } else if (parameter == "MQTT_USER") {
+                        } else if (parameter == "MQTT_PASS") {
+                        } else if (parameter == "CMD") {
+                            auto cmd_id = std::stoi(value.data());
+                            handle_command(cmd_id);
+                        } else if (parameter == "ENABLE_WIFI_NETWORKING") {
+                        } else if (parameter == "WIFI_SSID") {
+                        } else if (parameter == "WIFI_PASSWORD") {
+                        }
+                        osDelay(1);
                     }
+                    // auto first_equals = received_str.find('=');
+                    // etl::string<64> parameter = received_str.substr(0, first_equals);
+                    // if (first_equals != std::string::npos &&  parameter == "TARGET_TEMP") {
+                    //     std::size_t paramEnd = messageSize;
+                    //     if (auto split = received_str.find(";"); split != std::string::npos) {
+                    //         paramEnd = split;
+                    //     }
+                    //     auto valueStr = received_str.substr(first_equals + 1, paramEnd - (first_equals + 1)).data();
+                    //     std::int32_t tempValue = std::stoi(valueStr);
+                    //     osMessageQueuePut(_targetTemperatures, &tempValue, 0, 0);
+                    //     HAL_UART_Transmit_DMA(&huart1, reinterpret_cast<const uint8_t *>("TARGET_TEMP SET!\r\n"),
+                    //                           sizeof("TARGET_TEMP SET!\r\n"));
+                    // }
                 }
             }
 
             osDelay(10);
+        }
+    }
+
+    void communication_task::handle_command(std::uint8_t command) {
+        switch (static_cast<types::command>(command)) {
+            case types::command::RESTART:
+                NVIC_SystemReset();
+            case types::command::RESET_SETTINGS:
+                break;
+            case types::command::ENABLE_COOLING:
+            case types::command::DISABLE_COOLING: {
+                osMessageQueuePut(_controlCommands, &command, 0, 0);
+                break;
+            }
+            case types::command::GET_INT_TEMP: {
+                etl::string<20> temperatureStr{"INT_TEMP:"};
+                temperatureStr.append(std::to_string(_last_internal_temp).data());
+                temperatureStr.append("\r\n");
+                HAL_UART_Transmit_DMA(&huart1, reinterpret_cast<std::uint8_t *>(temperatureStr.data()), temperatureStr.size());
+                osDelay(10);
+                break;
+            }
+            case types::command::GET_INT_HUMIDITY:
+                break;
         }
     }
 } // tasks
