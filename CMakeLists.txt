@@ -12,11 +12,10 @@ Include(FetchContent)
 FetchContent_Declare(
         etl
         GIT_REPOSITORY https://github.com/ETLCPP/etl
-        GIT_TAG        20.45.0
+        GIT_TAG        20.47.1
 )
 
 FetchContent_MakeAvailable(etl)
-
 
 # Define the build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -51,7 +50,8 @@ add_executable(${CMAKE_PROJECT_NAME}
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cubemx-generated/cmake/stm32cubemx)
-add_subdirectory(drivers/Ethernet)
+add_subdirectory(drivers/ethernet_w5500)
+
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -83,6 +83,6 @@ list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 target_link_libraries(${CMAKE_PROJECT_NAME}
         etl::etl
         stm32cubemx
-        ethernet
+        ethernet_w5500
         # Add user defined libraries
 )
