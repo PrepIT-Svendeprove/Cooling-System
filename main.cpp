@@ -11,6 +11,7 @@
 
 #include "climate_control_task.hpp"
 #include "commands.hpp"
+#include "stm32f4xx_hal.h"
 #include "tasks/communication_task.hpp"
 
 extern "C" {
@@ -99,6 +100,7 @@ int main() {
     MX_SPI1_Init();
     MX_USART1_UART_Init();
     MX_USART2_UART_Init();
+    MX_USART6_UART_Init();
 
     osKernelInitialize();
     MX_FREERTOS_Init();

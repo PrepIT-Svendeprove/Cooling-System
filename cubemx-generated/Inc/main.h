@@ -61,6 +61,8 @@ void Error_Handler(void);
 #define LED_GPIO_Port GPIOC
 #define ENC_RST_Pin GPIO_PIN_3
 #define ENC_RST_GPIO_Port GPIOA
+#define SPI1_CS_Pin GPIO_PIN_4
+#define SPI1_CS_GPIO_Port GPIOA
 #define PELTIER_Pin GPIO_PIN_12
 #define PELTIER_GPIO_Port GPIOB
 #define INT_CIR_FAN_Pin GPIO_PIN_13
