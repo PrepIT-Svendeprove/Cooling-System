@@ -6,6 +6,7 @@
 
 
 #include "commands.hpp"
+#include "esp_at_wifi_mqtt.hpp"
 #include "spi.h"
 #include "stm32f4xx_hal_uart.h"
 #include "etl/string.h"
@@ -27,8 +28,14 @@ namespace tasks {
     }
 
     void communication_task::run() {
-        uint8_t data_str[] = "AT+CWJAP=\"WIFI_SSID\",\"WIFI_PASS\"";
-        HAL_UART_Transmit_DMA(&huart6, data_str, sizeof(data_str));
+        drivers::esp_at_wifi_mqtt mqtt{};
+        mqtt.connect_to_wifi("WIFI_SSID","WIFI_PASS");
+        osDelay(10);
+        mqtt.configure_mqtt_user("device","device");
+        osDelay(10);
+        mqtt.connect_to_mqtt("192.168.0.50","1883");
+        osDelay(10);
+        std::uint32_t lastTick{};
         while (true) {
             if (osMessageQueueGetCount(_ambientTemperatures) > 0) {
                 std::int32_t tempValue;
@@ -43,6 +50,18 @@ namespace tasks {
                 if (tempValue > 0) {
                     _last_internal_temp = tempValue;
                 }
+            }
+            if (auto currentTick = osKernelGetTickCount(); currentTick > lastTick + 2000) {
+                lastTick = currentTick;
+                etl::string<80> payload{"{\"climateDeviceCode\":\""};
+                payload.append("DEV01");
+                payload.append("\",\"temperature\":");
+                payload.append(std::to_string(_last_internal_temp).data());
+                payload.append(",\"humidity\":");
+                payload.append(std::to_string(_last_ambient_temp).data()); // TODO: Replace with internal Humidity
+                payload.append("}");
+                mqtt.publish_to_mqtt("climate/telemetry", payload);
+                HAL_UART_Transmit_DMA(&huart1, reinterpret_cast<const uint8_t *>(payload.data()), payload.size());
             }
 
             etl::array<std::uint8_t, 64> uartRxData{};
@@ -92,7 +111,7 @@ namespace tasks {
                             handle_command(cmd_id);
                         } else if (parameter == "ENABLE_WIFI_NETWORKING") {
                         } else if (parameter == "WIFI_SSID") {
-                        } else if (parameter == "WIFI_PASSWORD") {
+                        } else if (parameter == "WIFI_PASS") {
                         }
                         osDelay(1);
                     }
