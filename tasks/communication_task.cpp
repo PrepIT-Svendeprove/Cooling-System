@@ -7,6 +7,7 @@
 
 #include "commands.hpp"
 #include "spi.h"
+#include "stm32f4xx_hal_uart.h"
 #include "etl/string.h"
 #include "etl/vector.h"
 #include "usart.h"
@@ -26,6 +27,8 @@ namespace tasks {
     }
 
     void communication_task::run() {
+        uint8_t data_str[] = "AT+CWJAP=\"FTTH_JX3020\",\"vadoghabNev3\"";
+        HAL_UART_Transmit_DMA(&huart6, data_str, sizeof(data_str));
         while (true) {
             if (osMessageQueueGetCount(_ambientTemperatures) > 0) {
                 std::int32_t tempValue;
@@ -93,19 +96,7 @@ namespace tasks {
                         }
                         osDelay(1);
                     }
-                    // auto first_equals = received_str.find('=');
-                    // etl::string<64> parameter = received_str.substr(0, first_equals);
-                    // if (first_equals != std::string::npos &&  parameter == "TARGET_TEMP") {
-                    //     std::size_t paramEnd = messageSize;
-                    //     if (auto split = received_str.find(";"); split != std::string::npos) {
-                    //         paramEnd = split;
-                    //     }
-                    //     auto valueStr = received_str.substr(first_equals + 1, paramEnd - (first_equals + 1)).data();
-                    //     std::int32_t tempValue = std::stoi(valueStr);
-                    //     osMessageQueuePut(_targetTemperatures, &tempValue, 0, 0);
-                    //     HAL_UART_Transmit_DMA(&huart1, reinterpret_cast<const uint8_t *>("TARGET_TEMP SET!\r\n"),
-                    //                           sizeof("TARGET_TEMP SET!\r\n"));
-                    // }
+
                 }
             }
 
