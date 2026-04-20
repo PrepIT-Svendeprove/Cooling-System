@@ -16,7 +16,9 @@ namespace drivers {
         static bool connect_to_mqtt(const etl::string_view &broker, const etl::string_view &port);
         static bool configure_mqtt_user(etl::string_view username, etl::string_view password);
         static void publish_to_mqtt(etl::string_view topic, etl::string_view payload);
-
+        static void clean_mqtt();
+        static bool is_mqtt_connected();
+        static bool is_wifi_connected();
         void subscribe_to_mqtt(etl::string<32> topic);
         etl::string<128> poll_topic(etl::string<32> topic);
     private:

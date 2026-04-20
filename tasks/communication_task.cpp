@@ -11,7 +11,9 @@
 #include "stm32f4xx_hal_uart.h"
 #include "etl/string.h"
 #include "etl/vector.h"
+#include "etl/circular_buffer.h"
 #include "usart.h"
+
 
 namespace tasks {
     communication_task::communication_task(osMessageQueueId_t ambientTemperatures,
@@ -28,13 +30,21 @@ namespace tasks {
     }
 
     void communication_task::run() {
+        osDelay(1000);
         drivers::esp_at_wifi_mqtt mqtt{};
-        mqtt.connect_to_wifi("FTTH_JX3020","vadoghabNev3");
-        osDelay(10);
-        mqtt.configure_mqtt_user("device","device");
-        osDelay(10);
-        mqtt.connect_to_mqtt("192.168.0.50","1883");
-        osDelay(10);
+        bool connectedWifi = mqtt.is_wifi_connected();
+        if (!connectedWifi) {
+            connectedWifi = mqtt.connect_to_wifi("FTTH_JX3020", "vadoghabNev3");
+        }
+        osDelay(100);
+        if (connectedWifi) {
+            mqtt.clean_mqtt();
+            osDelay(100);
+            mqtt.configure_mqtt_user("device", "device");
+            osDelay(10);
+            mqtt.connect_to_mqtt("192.168.0.50", "1883");
+            osDelay(10);
+        }
         std::uint32_t lastTick{};
         while (true) {
             if (osMessageQueueGetCount(_ambientTemperatures) > 0) {
@@ -53,15 +63,17 @@ namespace tasks {
             }
             if (auto currentTick = osKernelGetTickCount(); currentTick > lastTick + 2000) {
                 lastTick = currentTick;
-                etl::string<80> payload{"{\"climateDeviceCode\":\""};
+                etl::string<80> payload{R"({\"climateDeviceCode\":\")"};
                 payload.append("DEV01");
-                payload.append("\",\"temperature\":");
+                payload.append(R"(\"\,\"temperature\":)");
                 payload.append(std::to_string(_last_internal_temp).data());
-                payload.append(",\"humidity\":");
+                payload.append(R"(\,\"humidity\":)");
                 payload.append(std::to_string(_last_ambient_temp).data()); // TODO: Replace with internal Humidity
-                payload.append("}");
-                mqtt.publish_to_mqtt("climate/telemetry", payload);
-                HAL_UART_Transmit_DMA(&huart1, reinterpret_cast<const uint8_t *>(payload.data()), payload.size());
+                payload.append(R"(})");
+                if (mqtt.is_mqtt_connected()) {
+                    mqtt.publish_to_mqtt("climate/telemetry", payload);
+                }
+                //HAL_UART_Transmit_DMA(&huart1, reinterpret_cast<const uint8_t *>(payload.data()), payload.size());
             }
 
             etl::array<std::uint8_t, 64> uartRxData{};
@@ -115,7 +127,6 @@ namespace tasks {
                         }
                         osDelay(1);
                     }
-
                 }
             }
 
@@ -138,7 +149,8 @@ namespace tasks {
                 etl::string<20> temperatureStr{"INT_TEMP:"};
                 temperatureStr.append(std::to_string(_last_internal_temp).data());
                 temperatureStr.append("\r\n");
-                HAL_UART_Transmit_DMA(&huart1, reinterpret_cast<std::uint8_t *>(temperatureStr.data()), temperatureStr.size());
+                HAL_UART_Transmit_DMA(&huart1, reinterpret_cast<std::uint8_t *>(temperatureStr.data()),
+                                      temperatureStr.size());
                 osDelay(10);
                 break;
             }
