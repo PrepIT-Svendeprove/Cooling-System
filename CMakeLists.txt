@@ -14,8 +14,14 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/ETLCPP/etl
         GIT_TAG        20.45.0
 )
+FetchContent_Declare(
+        ArduinoJson
+        GIT_REPOSITORY https://github.com/bblanchon/ArduinoJson.git
+        GIT_TAG        v7.4.3
+)
 
 FetchContent_MakeAvailable(etl)
+FetchContent_MakeAvailable(ArduinoJson)
 
 
 # Define the build type
@@ -85,6 +91,6 @@ list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 target_link_libraries(${CMAKE_PROJECT_NAME}
         etl::etl
         stm32cubemx
-        ethernet
+        ArduinoJson
         # Add user defined libraries
 )

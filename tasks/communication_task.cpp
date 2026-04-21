@@ -13,6 +13,7 @@
 #include "etl/vector.h"
 #include "etl/circular_buffer.h"
 #include "usart.h"
+#include "ArduinoJson.hpp"
 
 
 namespace tasks {
@@ -43,7 +44,9 @@ namespace tasks {
             mqtt.configure_mqtt_user("device", "device");
             osDelay(10);
             mqtt.connect_to_mqtt("192.168.0.50", "1883");
-            osDelay(10);
+            osDelay(1000);
+            mqtt.subscribe_to_mqtt("climate/control/DEV01");
+            osDelay(1000);
         }
         std::uint32_t lastTick{};
         while (true) {
@@ -61,7 +64,8 @@ namespace tasks {
                     _last_internal_temp = tempValue;
                 }
             }
-            if (auto currentTick = osKernelGetTickCount(); currentTick > lastTick + 2000) {
+            // Send to MQTT every 15 Seconds
+            if (auto currentTick = osKernelGetTickCount(); currentTick > lastTick + 15000) {
                 lastTick = currentTick;
                 etl::string<80> payload{R"({\"climateDeviceCode\":\")"};
                 payload.append("DEV01");
@@ -76,7 +80,7 @@ namespace tasks {
                 //HAL_UART_Transmit_DMA(&huart1, reinterpret_cast<const uint8_t *>(payload.data()), payload.size());
             }
 
-            etl::array<std::uint8_t, 64> uartRxData{};
+            etl::array<std::uint8_t, 128> uartRxData{};
             std::uint16_t receivedBytes = 0;
             HAL_UARTEx_ReceiveToIdle(&huart1, uartRxData.data(), uartRxData.size(), &receivedBytes, 100);
             if (receivedBytes > 0) {
@@ -129,7 +133,27 @@ namespace tasks {
                     }
                 }
             }
-
+            uartRxData.fill(0);
+            receivedBytes = 0;
+            HAL_UARTEx_ReceiveToIdle(&huart6, uartRxData.data(), uartRxData.size(), &receivedBytes, 100);
+            if (receivedBytes > 0) {
+                etl::string_view mqttString{reinterpret_cast<char*>(uartRxData.data()), receivedBytes};
+                if (mqttString.starts_with("+MQTTSUBRECV:0,") && receivedBytes > 15) {
+                    mqttString.remove_prefix(15);
+                    etl::string_view topic = mqttString.substr(0, mqttString.find_first_of(',')+1);
+                    osDelay(1);
+                    if (topic.contains("climate/control/DEV01")) {
+                        etl::string_view payload = mqttString.substr(mqttString.find_first_of('{'));
+                        ArduinoJson::JsonDocument doc;
+                        ArduinoJson::deserializeJson(doc, payload);
+                        auto temperature = doc["temperature"].as<std::int32_t>();
+                        // Minimum number we allow it to be set to.
+                        if (temperature > 2 && temperature < _last_ambient_temp) {
+                            osMessageQueuePut(_targetTemperatures, &temperature, 0, 0);
+                        }
+                    }
+                }
+            }
             osDelay(10);
         }
     }
@@ -149,8 +173,8 @@ namespace tasks {
                 etl::string<20> temperatureStr{"INT_TEMP:"};
                 temperatureStr.append(std::to_string(_last_internal_temp).data());
                 temperatureStr.append("\r\n");
-                HAL_UART_Transmit_DMA(&huart1, reinterpret_cast<std::uint8_t *>(temperatureStr.data()),
-                                      temperatureStr.size());
+                HAL_UART_Transmit(&huart1, reinterpret_cast<std::uint8_t *>(temperatureStr.data()),
+                                      temperatureStr.size(), 100);
                 osDelay(10);
                 break;
             }
