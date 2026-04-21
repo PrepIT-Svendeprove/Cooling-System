@@ -20,7 +20,7 @@ namespace tasks {
         }
 
     private:
-        static constexpr std::int32_t min_temp_target{-2};
+        static constexpr std::int32_t min_temp_target{2};
         static constexpr std::int32_t max_temp_target{15};
         static constexpr std::int32_t min_humidity_target{30};
         static constexpr std::int32_t max_humidity_target{60};

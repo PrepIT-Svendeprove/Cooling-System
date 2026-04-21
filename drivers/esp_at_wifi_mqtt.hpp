@@ -19,7 +19,7 @@ namespace drivers {
         static void clean_mqtt();
         static bool is_mqtt_connected();
         static bool is_wifi_connected();
-        void subscribe_to_mqtt(etl::string<32> topic);
+        bool subscribe_to_mqtt(etl::string<32> topic);
         etl::string<128> poll_topic(etl::string<32> topic);
     private:
         etl::vector<etl::string<32>, MaxTopics> _topics;

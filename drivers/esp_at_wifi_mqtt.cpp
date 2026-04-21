@@ -62,12 +62,35 @@ namespace drivers {
         connectionCommandString.append("\",0,0\r\n");
         write_at(connectionCommandString);
     }
-    
+
 
     void esp_at_wifi_mqtt::clean_mqtt() {
         etl::string_view connectionCommandString{"AT+MQTTCLEAN=0\r\n"};
         write_at(connectionCommandString);
     }
+
+    bool esp_at_wifi_mqtt::subscribe_to_mqtt(etl::string<32> topic) {
+        etl::string<32+20> cmd = "AT+MQTTSUB=0,";
+        cmd.append("\"");
+        cmd.append(topic);
+        cmd.append("\",1\r\n");
+        write_at(cmd);
+        std::uint16_t receivedBytes = 0;
+        std::uint8_t retries = 3;
+        etl::array<std::uint8_t, 128> dataBuffer{};
+        do {
+            HAL_UARTEx_ReceiveToIdle(&huart6, dataBuffer.data(), dataBuffer.size(), &receivedBytes, 1000);
+            if (receivedBytes > 0) {
+                etl::string_view response{reinterpret_cast<char *>(dataBuffer.data()), receivedBytes};
+                if (response.contains("OK")) {
+                    return true;
+                }
+            }
+            retries--;
+        } while (receivedBytes > 0 || retries > 0);
+        return false;
+    }
+
 
     bool esp_at_wifi_mqtt::is_mqtt_connected() {
         etl::string_view request{"AT+MQTTCONN?\r\n"};
@@ -88,7 +111,6 @@ namespace drivers {
                         return true;
                     }
                 }
-                // Optional: if you see OK or ERROR without +CWSTATE:2, we can stop early
                 if (response.contains("OK") || response.contains("ERROR")) {
                     break;
                 }
