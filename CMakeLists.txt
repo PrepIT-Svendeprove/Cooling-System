@@ -54,6 +54,8 @@ add_executable(${CMAKE_PROJECT_NAME}
         drivers/esp_at_wifi_mqtt.cpp
         drivers/esp_at_wifi_mqtt.hpp
         types/settings.hpp
+        drivers/DS18B20.cpp
+        drivers/DS18B20.hpp
 )
 
 #add_subdirectory(Application)

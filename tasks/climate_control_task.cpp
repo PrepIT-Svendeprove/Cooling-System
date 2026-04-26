@@ -2,14 +2,17 @@
 
 #include "aht_20.hpp"
 #include "commands.hpp"
+#include "DS18B20.hpp"
+#include "tim.h"
 
 namespace tasks {
     climate_control_task::climate_control_task(osMessageQueueId_t internal_temperatures,
                                                osMessageQueueId_t internal_humidity,
                                                osMessageQueueId_t target_temperatures,
                                                osMessageQueueId_t target_humidity,
-                                               osMessageQueueId_t control_commands) :
-        _internal_temperatures{internal_temperatures},
+                                               osMessageQueueId_t control_commands) : _internal_temperatures{
+            internal_temperatures
+        },
         _internal_humidity{internal_humidity},
         _target_temperatures{target_temperatures},
         _target_humidity{target_humidity},
@@ -20,17 +23,18 @@ namespace tasks {
     }
 
     void climate_control_task::run() {
-        drivers::aht20 temp_sensor{&hi2c2};
-        temp_sensor.init();
+        drivers::aht20 env_sensor{&hi2c2};
+        env_sensor.init();
+        drivers::DS18B20 heatsink_temp_sensor{&htim2,DS18B20PIN_GPIO_Port,DS18B20PIN_Pin};
 
         bool cooling_running{false};
         while (true) {
-            temp_sensor.read_sensor();
-
-            auto temp = temp_sensor.get_last_temperature();
+            env_sensor.read_sensor();
+            auto heatsink_temp = heatsink_temp_sensor.read_temp_celsius();
+            auto temp = env_sensor.get_last_temperature();
             osMessageQueuePut(_internal_temperatures, &temp, 0, 0);
 
-            auto humidity = temp_sensor.get_last_humidity();
+            auto humidity = env_sensor.get_last_humidity();
             osMessageQueuePut(_internal_humidity, &humidity, 0, 0);
 
             std::uint32_t targets = osMessageQueueGetCount(_target_temperatures);
@@ -52,11 +56,12 @@ namespace tasks {
 
             // For now only temperature is controllable, testing will conclude if humidity is realistic to change.
 
-            if ( _cooling_enabled && temp > _current_target_temperature) {
+            if (_cooling_enabled && temp > _current_target_temperature && heatsink_temp < 33) {
                 HAL_GPIO_WritePin(PELTIER_GPIO_Port, PELTIER_Pin, GPIO_PIN_SET);
+                osDelay(1000);
                 HAL_GPIO_WritePin(INT_CIR_FAN_GPIO_Port, INT_CIR_FAN_Pin, GPIO_PIN_SET);
                 cooling_running = true;
-            } else if (cooling_running) {
+            } else if (cooling_running && (heatsink_temp > 35 || temp <= _current_target_temperature)) {
                 HAL_GPIO_WritePin(INT_CIR_FAN_GPIO_Port, INT_CIR_FAN_Pin, GPIO_PIN_RESET);
                 osDelay(1000);
                 HAL_GPIO_WritePin(PELTIER_GPIO_Port, PELTIER_Pin, GPIO_PIN_RESET);
