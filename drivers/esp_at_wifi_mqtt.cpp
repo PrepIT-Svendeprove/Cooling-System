@@ -41,7 +41,20 @@ namespace drivers {
         connectionCommandString.append(port);
         connectionCommandString.append(",1\r\n");
         write_at(connectionCommandString);
-        return true; // TODO: If time, actually check for success
+        std::uint16_t receivedBytes = 0;
+        std::uint8_t retries = 3;
+        etl::array<std::uint8_t, 128> dataBuffer{};
+        do {
+            HAL_UARTEx_ReceiveToIdle(&huart6, dataBuffer.data(), dataBuffer.size(), &receivedBytes, 1000);
+            if (receivedBytes > 0) {
+                etl::string_view response{reinterpret_cast<char *>(dataBuffer.data()), receivedBytes};
+                if (response.contains("MQTTCONNECTED")) {
+                    return true;
+                }
+            }
+            retries--;
+        } while (receivedBytes > 0 || retries > 0);
+        return false;
     }
 
     bool esp_at_wifi_mqtt::configure_mqtt_user(etl::string_view username, etl::string_view password) {
