@@ -64,7 +64,7 @@ namespace {
     };
 
     const osThreadAttr_t communication_attr = {
-        .name = "Ext_Cooling",
+        .name = "Communication",
         .stack_size = 8192,
         .priority = osPriorityHigh
     };

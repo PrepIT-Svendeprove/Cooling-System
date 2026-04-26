@@ -139,6 +139,7 @@ namespace drivers {
                 if (response.contains("OK") || response.contains("ERROR")) {
                     break;
                 }
+                receivedBytes = 0;
             }
         } while ((osKernelGetTickCount() - start) < timeout_ms);
         return false;

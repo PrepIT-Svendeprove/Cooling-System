@@ -53,6 +53,7 @@ add_executable(${CMAKE_PROJECT_NAME}
         tasks/climate_control_task.hpp
         drivers/esp_at_wifi_mqtt.cpp
         drivers/esp_at_wifi_mqtt.hpp
+        types/settings.hpp
 )
 
 #add_subdirectory(Application)

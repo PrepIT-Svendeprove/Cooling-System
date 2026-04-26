@@ -20,9 +20,9 @@ namespace tasks {
     communication_task::communication_task(osMessageQueueId_t ambientTemperatures,
                                            osMessageQueueId_t internalTemperatures,
                                            osMessageQueueId_t targetTemperatures,
-                                           osMessageQueueId_t controlCommands) : _ambientTemperatures{
-            ambientTemperatures
-        },
+                                           osMessageQueueId_t controlCommands) : _settings{},
+        _mqtt{},
+        _ambientTemperatures{ambientTemperatures},
         _internalTemperatures{internalTemperatures},
         _targetTemperatures{targetTemperatures},
         _controlCommands{controlCommands},
@@ -32,22 +32,7 @@ namespace tasks {
 
     void communication_task::run() {
         osDelay(1000);
-        drivers::esp_at_wifi_mqtt mqtt{};
-        bool connectedWifi = mqtt.is_wifi_connected();
-        if (!connectedWifi) {
-            connectedWifi = mqtt.connect_to_wifi("FTTH_JX3020", "vadoghabNev3");
-        }
-        osDelay(100);
-        if (connectedWifi) {
-            mqtt.clean_mqtt();
-            osDelay(100);
-            mqtt.configure_mqtt_user("device", "device");
-            osDelay(10);
-            mqtt.connect_to_mqtt("192.168.0.50", "1883");
-            osDelay(1000);
-            mqtt.subscribe_to_mqtt("climate/control/DEV01");
-            osDelay(1000);
-        }
+
         std::uint32_t lastTick{};
         while (true) {
             if (osMessageQueueGetCount(_ambientTemperatures) > 0) {
@@ -68,29 +53,30 @@ namespace tasks {
             if (auto currentTick = osKernelGetTickCount(); currentTick > lastTick + 15000) {
                 lastTick = currentTick;
                 etl::string<80> payload{R"({\"climateDeviceCode\":\")"};
-                payload.append("DEV01");
+                payload.append(_settings.deviceCode);
                 payload.append(R"(\"\,\"temperature\":)");
                 payload.append(std::to_string(_last_internal_temp).data());
                 payload.append(R"(\,\"humidity\":)");
                 payload.append(std::to_string(_last_ambient_temp).data()); // TODO: Replace with internal Humidity
                 payload.append(R"(})");
-                if (mqtt.is_mqtt_connected()) {
-                    mqtt.publish_to_mqtt("climate/telemetry", payload);
+                etl::string<18 + 10> topic{"climate/telemetry/"};
+                topic.append(_settings.deviceCode);
+                if (_mqtt.is_mqtt_connected()) {
+                    _mqtt.publish_to_mqtt(topic, payload);
                 }
-                //HAL_UART_Transmit_DMA(&huart1, reinterpret_cast<const uint8_t *>(payload.data()), payload.size());
             }
 
-            etl::array<std::uint8_t, 128> uartRxData{};
+            etl::array<std::uint8_t, 132> uartRxData{};
             std::uint16_t receivedBytes = 0;
             HAL_UARTEx_ReceiveToIdle(&huart1, uartRxData.data(), uartRxData.size(), &receivedBytes, 100);
             if (receivedBytes > 0) {
                 if (uartRxData[0] == 0xAA && uartRxData[1] == 0xAA) {
                     std::uint8_t messageSize = uartRxData[2];
-                    etl::string<64> received_str{};
+                    etl::string<128> received_str{};
                     received_str.fill(0);
                     received_str.resize(messageSize);
                     etl::copy_n(uartRxData.data() + 3, messageSize, received_str.begin());
-                    etl::vector<etl::string<20>, 10> parameters{};
+                    etl::vector<etl::string<48>, 10> parameters{};
                     if (received_str.contains(';')) {
                         auto pos = received_str.find(';');
                         while (pos != std::string::npos) {
@@ -119,15 +105,24 @@ namespace tasks {
                             HAL_UART_Transmit_DMA(&huart1, reinterpret_cast<const uint8_t *>(responseStr.data()),
                                                   responseStr.size());
                         } else if (parameter == "MQTT_BROKER") {
+                            _settings.mqttBroker = value;
                         } else if (parameter == "MQTT_PORT") {
+                            _settings.mqttPort = value;
                         } else if (parameter == "MQTT_USER") {
+                            _settings.mqttUsername = value;
                         } else if (parameter == "MQTT_PASS") {
+                            _settings.mqttPassword = value;
                         } else if (parameter == "CMD") {
                             auto cmd_id = std::stoi(value.data());
                             handle_command(cmd_id);
                         } else if (parameter == "ENABLE_WIFI_NETWORKING") {
+                            // Ignored as current setup only supports wifi
                         } else if (parameter == "WIFI_SSID") {
+                            _settings.wifiSsid = value;
                         } else if (parameter == "WIFI_PASS") {
+                            _settings.wifiPassword = value;
+                        } else if (parameter == "ENDURE_DEVICE_CODE") {
+                            _settings.deviceCode = value;
                         }
                         osDelay(1);
                     }
@@ -135,25 +130,25 @@ namespace tasks {
             }
             uartRxData.fill(0);
             receivedBytes = 0;
-            HAL_UARTEx_ReceiveToIdle(&huart6, uartRxData.data(), uartRxData.size(), &receivedBytes, 100);
-            if (receivedBytes > 0) {
-                etl::string_view mqttString{reinterpret_cast<char*>(uartRxData.data()), receivedBytes};
-                if (mqttString.starts_with("+MQTTSUBRECV:0,") && receivedBytes > 15) {
-                    mqttString.remove_prefix(15);
-                    etl::string_view topic = mqttString.substr(0, mqttString.find_first_of(',')+1);
-                    osDelay(1);
-                    if (topic.contains("climate/control/DEV01")) {
-                        etl::string_view payload = mqttString.substr(mqttString.find_first_of('{'));
-                        ArduinoJson::JsonDocument doc;
-                        ArduinoJson::deserializeJson(doc, payload);
-                        auto temperature = doc["temperature"].as<std::int32_t>();
-                        // Minimum number we allow it to be set to.
-                        if (temperature > 2 && temperature < _last_ambient_temp) {
-                            osMessageQueuePut(_targetTemperatures, &temperature, 0, 0);
-                        }
-                    }
-                }
-            }
+            //HAL_UARTEx_ReceiveToIdle(&huart6, uartRxData.data(), uartRxData.size(), &receivedBytes, 100);
+            // if (receivedBytes > 0) {
+            //     etl::string_view mqttString{reinterpret_cast<char *>(uartRxData.data()), receivedBytes};
+            //     if (mqttString.starts_with("+MQTTSUBRECV:0,") && receivedBytes > 15) {
+            //         mqttString.remove_prefix(15);
+            //         etl::string_view topic = mqttString.substr(0, mqttString.find_first_of(',') + 1);
+            //         osDelay(1);
+            //         if (topic.contains("climate/control/") && topic.contains(_settings.deviceCode)) {
+            //             etl::string_view payload = mqttString.substr(mqttString.find_first_of('{'));
+            //             ArduinoJson::JsonDocument doc;
+            //             ArduinoJson::deserializeJson(doc, payload);
+            //             auto temperature = doc["temperature"].as<std::int32_t>();
+            //             // Minimum number we allow it to be set to.
+            //             if (temperature > 2 && temperature < _last_ambient_temp) {
+            //                 osMessageQueuePut(_targetTemperatures, &temperature, 0, 0);
+            //             }
+            //         }
+            //     }
+            // }
             osDelay(10);
         }
     }
@@ -163,6 +158,10 @@ namespace tasks {
             case types::command::RESTART:
                 NVIC_SystemReset();
             case types::command::RESET_SETTINGS:
+                break;
+            case types::command::SAVE_MQTT_SETTINGS:
+                break;
+            case types::command::SAVE_WIFI_SETTINGS:
                 break;
             case types::command::ENABLE_COOLING:
             case types::command::DISABLE_COOLING: {
@@ -174,12 +173,57 @@ namespace tasks {
                 temperatureStr.append(std::to_string(_last_internal_temp).data());
                 temperatureStr.append("\r\n");
                 HAL_UART_Transmit(&huart1, reinterpret_cast<std::uint8_t *>(temperatureStr.data()),
-                                      temperatureStr.size(), 100);
+                                  temperatureStr.size(), 100);
                 osDelay(10);
                 break;
             }
             case types::command::GET_INT_HUMIDITY:
                 break;
+            case types::command::CONNECT_MQTT:
+                connect_mqtt();
+                break;
+            case types::command::CONNECT_WIFI:
+                connect_wifi();
+                break;
         }
+    }
+
+    void communication_task::connect_wifi() {
+        if (!_settings.wifiSsid.empty() && !_settings.wifiPassword.empty()) {
+            _mqtt.connect_to_wifi(_settings.wifiSsid, _settings.wifiPassword);
+        }
+    }
+
+    void communication_task::connect_mqtt() {
+        etl::string<24> response{};
+        if (_mqtt.is_wifi_connected()) {
+            if (!_settings.mqttBroker.empty() && !_settings.mqttUsername.empty() && !_settings.mqttPassword.empty() && !_settings.deviceCode.empty()) {
+                _mqtt.clean_mqtt();
+                osDelay(100);
+                _mqtt.configure_mqtt_user(_settings.mqttUsername, _settings.mqttPassword);
+                osDelay(10);
+                _mqtt.connect_to_mqtt(_settings.mqttBroker, _settings.mqttPort);
+                osDelay(100);
+                etl::string<26> topic{"climate/control/"};
+                topic.append(_settings.deviceCode);
+                _mqtt.subscribe_to_mqtt(topic);
+                etl::string<26> lwTopic{"climate/lw/"};
+                lwTopic.append(_settings.deviceCode);
+                etl::string<26> lwPayload{R"({\"climateDeviceCode\":\")"};
+                lwPayload.append(_settings.deviceCode);
+                lwPayload.append(R"(\"})");
+                _mqtt.publish_to_mqtt(lwTopic, lwPayload);
+                response = "MQTT CONNECTED";
+            } else {
+                response = "MQTT PARAM MISSING:";
+                response.append(_settings.mqttBroker.empty() ? "0":"1");
+                response.append(_settings.mqttUsername.empty() ? "0":"1");
+                response.append(_settings.mqttPassword.empty() ? "0":"1");
+                response.append(_settings.deviceCode.empty() ? "0":"1");
+            }
+        } else {
+            response = "NO WIFI";
+        }
+        HAL_UART_Transmit_DMA(&huart1, reinterpret_cast<std::uint8_t *>(response.data()), response.length());
     }
 } // tasks

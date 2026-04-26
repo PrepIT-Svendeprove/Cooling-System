@@ -2,6 +2,8 @@
 #include <etl/string_view.h>
 
 #include "cmsis_os2.h"
+#include "esp_at_wifi_mqtt.hpp"
+#include "settings.hpp"
 
 namespace tasks {
     class communication_task {
@@ -15,7 +17,12 @@ namespace tasks {
         }
 
     private:
+        void connect_mqtt();
+        void connect_wifi();
+
         void handle_command(std::uint8_t command);
+        types::settings _settings;
+        drivers::esp_at_wifi_mqtt _mqtt;
         osMessageQueueId_t _ambientTemperatures;
         osMessageQueueId_t _internalTemperatures;
         osMessageQueueId_t _targetTemperatures;
