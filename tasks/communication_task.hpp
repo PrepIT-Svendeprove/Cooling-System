@@ -8,7 +8,7 @@
 namespace tasks {
     class communication_task {
     public:
-        communication_task(osMessageQueueId_t ambientTemperatures, osMessageQueueId_t internalTemperatures, osMessageQueueId_t targetTemperatures, osMessageQueueId_t controlCommands);
+        communication_task(osMessageQueueId_t ambientTemperatures, osMessageQueueId_t internalTemperatures, osMessageQueueId_t internalHumidity, osMessageQueueId_t targetTemperatures, osMessageQueueId_t controlCommands);
 
         void run();
 
@@ -25,10 +25,12 @@ namespace tasks {
         drivers::esp_at_wifi_mqtt _mqtt;
         osMessageQueueId_t _ambientTemperatures;
         osMessageQueueId_t _internalTemperatures;
+        osMessageQueueId_t _internalHumidity;
         osMessageQueueId_t _targetTemperatures;
         osMessageQueueId_t _controlCommands;
         std::int32_t _last_ambient_temp;
         std::int32_t _last_internal_temp;
+        std::int32_t _last_internal_humidity;
         bool _mqttValueUpdated;
     };
 } // tasks

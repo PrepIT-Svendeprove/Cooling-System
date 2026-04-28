@@ -46,6 +46,7 @@ namespace {
     tasks::communication_task comms_task{
         ambient_temperatures_queue_id,
         internal_temperatures_queue_id,
+        internal_humidity_queue_id,
         target_temperatures_queue_id,
         control_commands_queue_id
     };
